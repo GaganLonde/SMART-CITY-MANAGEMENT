@@ -2,7 +2,7 @@
 CRUD operations for all tables
 """
 from app.database import db
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Union
 import json
 
 # ==================== ADDRESSES ====================
@@ -52,13 +52,25 @@ def create_citizen(data: dict):
     citizen_id = db.execute_insert(query, data)
     return get_citizen(citizen_id)
 
-def get_citizen(citizen_id: int):
-    query = "SELECT * FROM citizens WHERE citizen_id = %s"
-    return db.execute_one(query, (citizen_id,))
+def get_citizen(identifier: Union[int, str]):
+    if isinstance(identifier, str) and not identifier.isdigit():
+        # If it's a string and not a digit, search by name (exact match)
+        query = "SELECT * FROM citizens WHERE name = %s"
+        return db.execute_one(query, (identifier,))
+    else:
+        # If it's an int or a string that represents a digit, search by ID
+        citizen_id = int(identifier)
+        query = "SELECT * FROM citizens WHERE citizen_id = %s"
+        return db.execute_one(query, (citizen_id,))
 
-def get_all_citizens(skip: int = 0, limit: int = 100):
-    query = "SELECT * FROM citizens LIMIT %s OFFSET %s"
-    return db.execute_query(query, (limit, skip))
+def get_all_citizens(skip: int = 0, limit: int = 100, name: Optional[str] = None):
+    if name:
+        query = "SELECT * FROM citizens WHERE name LIKE %s LIMIT %s OFFSET %s"
+        search_pattern = f"%{name}%"
+        return db.execute_query(query, (search_pattern, limit, skip))
+    else:
+        query = "SELECT * FROM citizens LIMIT %s OFFSET %s"
+        return db.execute_query(query, (limit, skip))
 
 def update_citizen(citizen_id: int, data: dict):
     fields = []

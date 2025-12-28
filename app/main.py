@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Optional
 from app import crud
 from app.models import *
+from typing import Union
 
 app = FastAPI(
     title="Smart City Management System API",
@@ -70,14 +71,14 @@ def create_citizen(citizen: CitizenCreate):
         raise HTTPException(status_code=400, detail=str(e))
 
 @app.get("/citizens", response_model=List[dict], tags=["Citizens"])
-def read_citizens(skip: int = 0, limit: int = 100):
-    """Get all citizens"""
-    return crud.get_all_citizens(skip, limit)
+def read_citizens(skip: int = 0, limit: int = 100, name: Optional[str] = Query(None, description="Search citizens by name (partial match)")):
+    """Get all citizens, optionally filtered by name"""
+    return crud.get_all_citizens(skip, limit, name)
 
-@app.get("/citizens/{citizen_id}", response_model=dict, tags=["Citizens"])
-def read_citizen(citizen_id: int):
-    """Get citizen by ID"""
-    citizen = crud.get_citizen(citizen_id)
+@app.get("/citizens/{identifier}", response_model=dict, tags=["Citizens"])
+def read_citizen(identifier: Union[int, str]):
+    """Get citizen by ID (if integer) or by name (if string)"""
+    citizen = crud.get_citizen(identifier)
     if citizen is None:
         raise HTTPException(status_code=404, detail="Citizen not found")
     return citizen
