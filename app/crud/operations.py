@@ -771,3 +771,90 @@ def delete_complaint_update(update_id: int):
     db.execute_query(query, (update_id,), fetch=False)
     return {"message": "Complaint update deleted successfully"}
 
+# ==================== DASHBOARD STATS ====================
+def get_dashboard_stats():
+    """Get aggregated statistics for dashboard"""
+    stats = {}
+    
+    # Total citizens
+    result = db.execute_one("SELECT COUNT(*) as count FROM citizens")
+    stats['total_citizens'] = result['count'] if result else 0
+    
+    # Total utility accounts
+    result = db.execute_one("SELECT COUNT(*) as count FROM utility_accounts")
+    stats['total_utility_accounts'] = result['count'] if result else 0
+    
+    # Electricity usage (current month)
+    year_result = db.execute_one("SELECT YEAR(CURRENT_DATE) as year")
+    month_result = db.execute_one("SELECT MONTH(CURRENT_DATE) as month")
+    current_year = year_result['year'] if year_result else 2025
+    current_month = month_result['month'] if month_result else 1
+    
+    elec_usage = db.execute_one(
+        "SELECT COALESCE(SUM(units_consumed), 0) as total FROM electricity_usage WHERE usage_month = %s AND usage_month_number = %s",
+        (current_year, current_month)
+    )
+    stats['electricity_usage_kwh'] = float(elec_usage['total']) if elec_usage and elec_usage.get('total') is not None else 0
+    
+    # Water usage (current month)
+    water_usage = db.execute_one(
+        "SELECT COALESCE(SUM(litres_consumed), 0) as total FROM water_usage WHERE usage_month = %s AND usage_month_number = %s",
+        (current_year, current_month)
+    )
+    stats['water_usage_litres'] = float(water_usage['total']) if water_usage and water_usage.get('total') is not None else 0
+    
+    # Active buses
+    result = db.execute_one("SELECT COUNT(*) as count FROM buses WHERE active = TRUE")
+    stats['active_buses'] = result['count'] if result else 0
+    
+    # Emergency requests by status
+    result = db.execute_one("SELECT COUNT(*) as count FROM emergency_requests WHERE status = 'Open'")
+    stats['emergency_open'] = result['count'] if result else 0
+    result = db.execute_one("SELECT COUNT(*) as count FROM emergency_requests WHERE status = 'Dispatched'")
+    stats['emergency_dispatched'] = result['count'] if result else 0
+    result = db.execute_one("SELECT COUNT(*) as count FROM emergency_requests WHERE status = 'Resolved'")
+    stats['emergency_resolved'] = result['count'] if result else 0
+    
+    # Complaints by status
+    result = db.execute_one("SELECT COUNT(*) as count FROM complaints WHERE status = 'Open'")
+    stats['complaints_open'] = result['count'] if result else 0
+    result = db.execute_one("SELECT COUNT(*) as count FROM complaints WHERE status = 'In Progress'")
+    stats['complaints_in_progress'] = result['count'] if result else 0
+    result = db.execute_one("SELECT COUNT(*) as count FROM complaints WHERE status = 'Resolved'")
+    stats['complaints_resolved'] = result['count'] if result else 0
+    
+    # Waste collection stats
+    result = db.execute_one("SELECT COUNT(*) as count FROM waste_collection_zones")
+    stats['waste_zones'] = result['count'] if result else 0
+    result = db.execute_one("SELECT COUNT(*) as count FROM trucks WHERE active = TRUE")
+    stats['active_trucks'] = result['count'] if result else 0
+    
+    # Revenue (sum of paid bills)
+    elec_revenue = db.execute_one(
+        "SELECT COALESCE(SUM(amount), 0) as total FROM electricity_bills WHERE status = 'Paid'"
+    )
+    water_revenue = db.execute_one(
+        "SELECT COALESCE(SUM(amount), 0) as total FROM water_bills WHERE status = 'Paid'"
+    )
+    elec_total = float(elec_revenue['total']) if elec_revenue and elec_revenue.get('total') is not None else 0
+    water_total = float(water_revenue['total']) if water_revenue and water_revenue.get('total') is not None else 0
+    stats['total_revenue'] = elec_total + water_total
+    
+    # Pending bills
+    result = db.execute_one(
+        "SELECT COUNT(*) as count FROM (SELECT bill_id FROM electricity_bills WHERE status != 'Paid' UNION ALL SELECT bill_id FROM water_bills WHERE status != 'Paid') as t"
+    )
+    stats['pending_bills'] = result['count'] if result else 0
+    
+    # Recent emergency requests (last 5)
+    stats['recent_emergencies'] = db.execute_query(
+        "SELECT req_id, service_id, location, status, request_datetime, created_at FROM emergency_requests ORDER BY request_datetime DESC LIMIT 5"
+    ) or []
+    
+    # Recent complaints (last 5)
+    stats['recent_complaints'] = db.execute_query(
+        "SELECT complaint_id, category, description, status, date_reported, created_at FROM complaints ORDER BY date_reported DESC LIMIT 5"
+    ) or []
+    
+    return stats
+

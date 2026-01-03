@@ -68,10 +68,20 @@ def create_citizen(citizen: CitizenCreate):
     try:
         return crud.create_citizen(citizen.dict(exclude_none=True))
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        error_detail = str(e)
+        # Provide more user-friendly error messages
+        if "foreign key constraint" in error_detail.lower():
+            error_detail = "Invalid address_id. Please ensure the address exists."
+        elif "duplicate" in error_detail.lower() or "unique" in error_detail.lower():
+            error_detail = "A citizen with this information already exists."
+        raise HTTPException(status_code=400, detail=error_detail)
 
 @app.get("/citizens", response_model=List[dict], tags=["Citizens"])
-def read_citizens(skip: int = 0, limit: int = 100, name: Optional[str] = Query(None, description="Search citizens by name (partial match)")):
+def read_citizens(
+    skip: int = Query(0, ge=0, description="Number of records to skip"),
+    limit: int = Query(100, ge=1, le=1000, description="Maximum number of records to return"),
+    name: Optional[str] = Query(None, description="Search citizens by name (partial match, case-insensitive)")
+):
     """Get all citizens, optionally filtered by name"""
     return crud.get_all_citizens(skip, limit, name)
 
@@ -817,6 +827,12 @@ def delete_complaint_update(update_id: int):
         return crud.delete_complaint_update(update_id)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+# ==================== DASHBOARD STATS ROUTE ====================
+@app.get("/stats", response_model=dict, tags=["Dashboard"])
+def get_stats():
+    """Get dashboard statistics"""
+    return crud.get_dashboard_stats()
 
 # ==================== ROOT ROUTE ====================
 @app.get("/", tags=["Root"])
