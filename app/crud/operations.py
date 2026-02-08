@@ -503,11 +503,34 @@ def delete_emergency_service(service_id: int):
 
 # ==================== EMERGENCY REQUESTS ====================
 def create_emergency_request(data: dict):
-    query = """
-        INSERT INTO emergency_requests (citizen_id, service_id, request_datetime, incident_datetime, location, status, notes)
-        VALUES (%(citizen_id)s, %(service_id)s, %(request_datetime)s, %(incident_datetime)s, %(location)s, %(status)s, %(notes)s)
+    # Build query dynamically to only include provided fields
+    query_fields = []
+    query_values = []
+    params = {}
+    
+    # Required field
+    query_fields.append('service_id')
+    query_values.append("%(service_id)s")
+    params['service_id'] = data['service_id']
+    
+    # Optional fields - only include if provided
+    for key in ['citizen_id', 'location', 'status', 'notes', 'incident_datetime']:
+        if key in data:
+            query_fields.append(key)
+            query_values.append(f"%({key})s")
+            params[key] = data[key]
+    
+    # Don't include request_datetime if not provided - let database use DEFAULT CURRENT_TIMESTAMP
+    if 'request_datetime' in data and data['request_datetime'] is not None:
+        query_fields.append('request_datetime')
+        query_values.append("%(request_datetime)s")
+        params['request_datetime'] = data['request_datetime']
+    
+    query = f"""
+        INSERT INTO emergency_requests ({', '.join(query_fields)})
+        VALUES ({', '.join(query_values)})
     """
-    req_id = db.execute_insert(query, data)
+    req_id = db.execute_insert(query, params)
     return get_emergency_request(req_id)
 
 def get_emergency_request(req_id: int):
@@ -685,11 +708,32 @@ def delete_waste_collection_log(log_id: int):
 
 # ==================== COMPLAINTS ====================
 def create_complaint(data: dict):
-    query = """
-        INSERT INTO complaints (citizen_id, category, description, date_reported, status, assigned_to, priority)
-        VALUES (%(citizen_id)s, %(category)s, %(description)s, %(date_reported)s, %(status)s, %(assigned_to)s, %(priority)s)
+    # Ensure assigned_to is None if not provided
+    if 'assigned_to' not in data:
+        data['assigned_to'] = None
+    
+    # Don't include date_reported if not provided - let database use DEFAULT
+    query_fields = []
+    query_values = []
+    params = {}
+    
+    for key in ['citizen_id', 'category', 'description', 'status', 'assigned_to', 'priority']:
+        if key in data:
+            query_fields.append(key)
+            query_values.append(f"%({key})s")
+            params[key] = data[key]
+    
+    # Only add date_reported if explicitly provided
+    if 'date_reported' in data and data['date_reported'] is not None:
+        query_fields.append('date_reported')
+        query_values.append("%(date_reported)s")
+        params['date_reported'] = data['date_reported']
+    
+    query = f"""
+        INSERT INTO complaints ({', '.join(query_fields)})
+        VALUES ({', '.join(query_values)})
     """
-    complaint_id = db.execute_insert(query, data)
+    complaint_id = db.execute_insert(query, params)
     return get_complaint(complaint_id)
 
 def get_complaint(complaint_id: int):

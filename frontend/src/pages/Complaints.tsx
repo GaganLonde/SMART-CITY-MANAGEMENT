@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState, useRef } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { StatCard } from "@/components/ui/stat-card";
 import { DataTable } from "@/components/ui/data-table";
@@ -10,14 +10,18 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { MessageSquare, Clock, CheckCircle, XCircle, Plus } from "lucide-react";
+import { MessageSquare, Clock, CheckCircle, XCircle, Plus, PlayCircle } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { complaintsApi } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 
 export default function Complaints() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<string>("");
+  const [selectedPriority, setSelectedPriority] = useState<string>("Medium");
+  const formRef = useRef<HTMLFormElement>(null);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const { data: complaints = [], isLoading, refetch } = useQuery({
     queryKey: ["complaints"],
@@ -39,32 +43,152 @@ export default function Complaints() {
     },
     { key: "status", header: "Status", render: (item: any) => <StatusBadge status={item.status?.toLowerCase() || "open"} /> },
     { key: "priority", header: "Priority" },
+    {
+      key: "actions",
+      header: "Actions",
+      render: (item: any) => {
+        const currentStatus = item?.status || "Open";
+        
+        // Determine next status in cycle: Open → In Progress → Resolved → Open
+        const getNextStatus = (status: string): string => {
+          switch (status) {
+            case "Open":
+              return "In Progress";
+            case "In Progress":
+              return "Resolved";
+            case "Resolved":
+              return "Open";
+            default:
+              return "In Progress";
+          }
+        };
+        
+        const nextStatus = getNextStatus(currentStatus);
+        
+        // Get button text and icon based on next status
+        const getButtonConfig = (nextStatus: string) => {
+          switch (nextStatus) {
+            case "In Progress":
+              return { text: "Start Progress", icon: PlayCircle, variant: "default" as const };
+            case "Resolved":
+              return { text: "Mark Resolved", icon: CheckCircle, variant: "default" as const };
+            case "Open":
+              return { text: "Reopen", icon: XCircle, variant: "outline" as const };
+            default:
+              return { text: "Update Status", icon: PlayCircle, variant: "default" as const };
+          }
+        };
+        
+        const buttonConfig = getButtonConfig(nextStatus);
+        const ButtonIcon = buttonConfig.icon;
+        
+        return (
+          <Button
+            variant={buttonConfig.variant}
+            size="sm"
+            onClick={() => handleToggleStatus(item.complaint_id, nextStatus)}
+            className="gap-2"
+          >
+            <ButtonIcon className="h-4 w-4" />
+            {buttonConfig.text}
+          </Button>
+        );
+      },
+    },
   ];
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    const data = {
-      category: formData.get("category") as string || null,
-      description: formData.get("description") as string || null,
-      citizen_id: formData.get("citizen_id") ? parseInt(formData.get("citizen_id") as string) : null,
-      priority: formData.get("priority") as string || "Medium",
+    
+    // Get description from form
+    const description = (formData.get("description") as string)?.trim() || null;
+    
+    if (!description) {
+      toast({ 
+        title: "Error", 
+        description: "Please provide a description", 
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    if (!selectedCategory) {
+      toast({ 
+        title: "Error", 
+        description: "Please select a category", 
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    // Build data object, only including fields that have values
+    const data: any = {
+      category: selectedCategory,
+      description: description,
+      priority: selectedPriority,
       status: "Open",
     };
+    
+    // Add citizen_id only if provided
+    const citizenId = formData.get("citizen_id") && (formData.get("citizen_id") as string).trim();
+    if (citizenId) {
+      data.citizen_id = parseInt(citizenId);
+    }
+    
+    // Don't send date_reported or assigned_to - let database handle defaults
 
     try {
       await complaintsApi.create(data);
       toast({ title: "Success", description: "Complaint filed successfully" });
+      // Reset form and state
+      if (formRef.current) {
+        formRef.current.reset();
+      }
+      setSelectedCategory("");
+      setSelectedPriority("Medium");
       setIsDialogOpen(false);
       refetch();
-    } catch (error) {
-      toast({ title: "Error", description: "Failed to file complaint", variant: "destructive" });
+    } catch (error: any) {
+      const errorMessage = error?.message || "Failed to file complaint";
+      toast({ 
+        title: "Error", 
+        description: errorMessage, 
+        variant: "destructive" 
+      });
     }
   };
 
   const pending = complaints.filter((c: any) => c.status === "Open").length;
   const active = complaints.filter((c: any) => c.status === "In Progress").length;
   const resolved = complaints.filter((c: any) => c.status === "Resolved").length;
+
+  const handleToggleStatus = async (complaintId: number, newStatus: string) => {
+    try {
+      await complaintsApi.update(complaintId, { status: newStatus });
+      toast({
+        title: "Success",
+        description: `Complaint status updated to ${newStatus}`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["complaints"] });
+    } catch (error: any) {
+      // Extract error message properly
+      let errorMessage = "Failed to update complaint status";
+      if (error?.message) {
+        errorMessage = typeof error.message === 'string' ? error.message : String(error.message);
+      } else if (error?.detail) {
+        errorMessage = typeof error.detail === 'string' ? error.detail : String(error.detail);
+      } else if (error) {
+        errorMessage = typeof error === 'string' ? error : String(error);
+      }
+      
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    }
+  };
 
   return (
     <MainLayout title="Complaints" subtitle="Citizen complaints and feedback">
@@ -130,7 +254,13 @@ export default function Complaints() {
       <Card className="mt-6 border-border bg-card">
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-lg">All Complaints</CardTitle>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <Dialog open={isDialogOpen} onOpenChange={(open) => {
+            setIsDialogOpen(open);
+            if (!open) {
+              setSelectedCategory("");
+              setSelectedPriority("Medium");
+            }
+          }}>
             <DialogTrigger asChild>
               <Button className="gap-2">
                 <Plus size={16} />
@@ -141,10 +271,10 @@ export default function Complaints() {
               <DialogHeader>
                 <DialogTitle>File New Complaint</DialogTitle>
               </DialogHeader>
-              <form onSubmit={handleSubmit} className="space-y-4">
+              <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="category">Category</Label>
-                  <Select name="category" required>
+                  <Select value={selectedCategory} onValueChange={setSelectedCategory} required>
                     <SelectTrigger>
                       <SelectValue placeholder="Select category" />
                     </SelectTrigger>
@@ -162,12 +292,12 @@ export default function Complaints() {
                   <Textarea id="description" name="description" rows={4} required />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="citizen_id">Citizen ID (optional)</Label>
-                  <Input id="citizen_id" name="citizen_id" type="number" />
+                  <Label htmlFor="citizen_id">Citizen ID <span className="text-muted-foreground text-sm">(optional)</span></Label>
+                  <Input id="citizen_id" name="citizen_id" type="number" placeholder="Leave empty if not applicable" />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="priority">Priority</Label>
-                  <Select name="priority" defaultValue="Medium">
+                  <Select value={selectedPriority} onValueChange={setSelectedPriority}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select priority" />
                     </SelectTrigger>

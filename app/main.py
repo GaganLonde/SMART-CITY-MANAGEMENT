@@ -765,14 +765,27 @@ def read_complaints_by_citizen(citizen_id: int):
 
 @app.put("/complaints/{complaint_id}", response_model=dict, tags=["Complaints"])
 def update_complaint(complaint_id: int, complaint: ComplaintUpdate):
-    """Update complaint"""
+    """Update complaint - accepts partial updates"""
     try:
-        result = crud.update_complaint(complaint_id, complaint.dict(exclude_none=True))
+        # Convert to dict, excluding None values for partial updates
+        # Pydantic v2 uses model_dump(), v1 uses dict()
+        try:
+            complaint_data = complaint.model_dump(exclude_none=True)
+        except AttributeError:
+            complaint_data = complaint.dict(exclude_none=True)
+        
+        result = crud.update_complaint(complaint_id, complaint_data)
         if result is None:
             raise HTTPException(status_code=404, detail="Complaint not found")
         return result
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        error_detail = str(e)
+        # Provide more user-friendly error messages
+        if "Field required" in error_detail:
+            error_detail = "Invalid request data. Please check all required fields are provided."
+        raise HTTPException(status_code=400, detail=error_detail)
 
 @app.delete("/complaints/{complaint_id}", tags=["Complaints"])
 def delete_complaint(complaint_id: int):
@@ -784,7 +797,7 @@ def delete_complaint(complaint_id: int):
 
 # ==================== COMPLAINT UPDATES ROUTES ====================
 @app.post("/complaint-updates", response_model=dict, tags=["Complaint Updates"])
-def create_complaint_update(update: ComplaintUpdateCreate):
+def create_complaint_update(update: ComplaintUpdateHistoryCreate):
     """Create a new complaint update"""
     try:
         return crud.create_complaint_update(update.dict(exclude_none=True))
@@ -810,7 +823,7 @@ def read_complaint_updates_by_complaint(complaint_id: int):
     return crud.get_complaint_updates_by_complaint(complaint_id)
 
 @app.put("/complaint-updates/{update_id}", response_model=dict, tags=["Complaint Updates"])
-def update_complaint_update(update_id: int, update: ComplaintUpdateUpdate):
+def update_complaint_update(update_id: int, update: ComplaintUpdateHistoryUpdate):
     """Update complaint update"""
     try:
         result = crud.update_complaint_update(update_id, update.dict(exclude_none=True))

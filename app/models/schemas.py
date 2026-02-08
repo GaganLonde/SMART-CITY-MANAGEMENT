@@ -408,6 +408,10 @@ class ComplaintUpdate(BaseModel):
     status: Optional[str] = None
     assigned_to: Optional[str] = None
     priority: Optional[str] = None
+    
+    class Config:
+        # Allow partial updates - all fields are optional
+        extra = "forbid"
 
 class Complaint(ComplaintBase):
     complaint_id: int
@@ -416,22 +420,22 @@ class Complaint(ComplaintBase):
     class Config:
         from_attributes = True
 
-# Complaint Update Models
-class ComplaintUpdateBase(BaseModel):
+# Complaint Update History Models (for tracking complaint updates/changes)
+class ComplaintUpdateHistoryBase(BaseModel):
     complaint_id: int
     update_time: Optional[datetime] = None
     updated_by: Optional[str] = None
     comment: Optional[str] = None
 
-class ComplaintUpdateCreate(ComplaintUpdateBase):
+class ComplaintUpdateHistoryCreate(ComplaintUpdateHistoryBase):
     pass
 
-class ComplaintUpdateUpdate(BaseModel):
+class ComplaintUpdateHistoryUpdate(BaseModel):
     update_time: Optional[datetime] = None
     updated_by: Optional[str] = None
     comment: Optional[str] = None
 
-class ComplaintUpdate(ComplaintUpdateBase):
+class ComplaintUpdateHistory(ComplaintUpdateHistoryBase):
     update_id: int
     created_at: datetime
     

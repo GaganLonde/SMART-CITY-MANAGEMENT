@@ -1,14 +1,19 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { StatCard } from "@/components/ui/stat-card";
 import { DataTable } from "@/components/ui/data-table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Zap, Droplets, DollarSign, TrendingUp } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Zap, Droplets, DollarSign, TrendingUp, CheckCircle, XCircle } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { electricityBillsApi, waterBillsApi, electricityUsageApi, waterUsageApi } from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Utilities() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
   const { data: electricityBills = [], isLoading: loadingElecBills, error: errorElecBills } = useQuery({
     queryKey: ["electricity-bills"],
     queryFn: () => electricityBillsApi.getAll().catch(() => []),
@@ -90,6 +95,33 @@ export default function Utilities() {
         }
       }
     },
+    {
+      key: "actions",
+      header: "Actions",
+      render: (item: any) => {
+        const isPaid = item?.status === "Paid";
+        return (
+          <Button
+            variant={isPaid ? "outline" : "default"}
+            size="sm"
+            onClick={() => handleToggleBillStatus("electricity", item.bill_id, isPaid ? "Unpaid" : "Paid")}
+            className="gap-2"
+          >
+            {isPaid ? (
+              <>
+                <XCircle className="h-4 w-4" />
+                Mark Unpaid
+              </>
+            ) : (
+              <>
+                <CheckCircle className="h-4 w-4" />
+                Mark Paid
+              </>
+            )}
+          </Button>
+        );
+      },
+    },
   ];
 
   const waterBillColumns = [
@@ -148,6 +180,33 @@ export default function Utilities() {
           return <StatusBadge status="unpaid" />;
         }
       }
+    },
+    {
+      key: "actions",
+      header: "Actions",
+      render: (item: any) => {
+        const isPaid = item?.status === "Paid";
+        return (
+          <Button
+            variant={isPaid ? "outline" : "default"}
+            size="sm"
+            onClick={() => handleToggleBillStatus("water", item.bill_id, isPaid ? "Unpaid" : "Paid")}
+            className="gap-2"
+          >
+            {isPaid ? (
+              <>
+                <XCircle className="h-4 w-4" />
+                Mark Unpaid
+              </>
+            ) : (
+              <>
+                <CheckCircle className="h-4 w-4" />
+                Mark Paid
+              </>
+            )}
+          </Button>
+        );
+      },
     },
   ];
 
@@ -243,6 +302,28 @@ export default function Utilities() {
   const pendingBills = 
     electricityBillsArray.filter((b: any) => b?.status !== "Paid").length +
     waterBillsArray.filter((b: any) => b?.status !== "Paid").length;
+
+  const handleToggleBillStatus = async (type: "electricity" | "water", billId: number, newStatus: string) => {
+    try {
+      if (type === "electricity") {
+        await electricityBillsApi.update(billId, { status: newStatus });
+      } else {
+        await waterBillsApi.update(billId, { status: newStatus });
+      }
+      toast({
+        title: "Success",
+        description: `Bill status updated to ${newStatus}`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["electricity-bills"] });
+      queryClient.invalidateQueries({ queryKey: ["water-bills"] });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error?.message || "Failed to update bill status",
+        variant: "destructive",
+      });
+    }
+  };
 
   return (
     <MainLayout title="Utilities" subtitle="Manage electricity and water services">

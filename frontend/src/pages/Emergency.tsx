@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState, useRef } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { StatCard } from "@/components/ui/stat-card";
 import { DataTable } from "@/components/ui/data-table";
@@ -10,14 +10,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AlertTriangle, Ambulance, Shield, Flame, Plus, Phone } from "lucide-react";
+import { AlertTriangle, Ambulance, Shield, Flame, Plus, Phone, CheckCircle, Send } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { emergencyRequestsApi, emergencyServicesApi } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 
 export default function Emergency() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [selectedServiceId, setSelectedServiceId] = useState<string>("");
+  const formRef = useRef<HTMLFormElement>(null);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const { data: requests = [], isLoading: loadingRequests, refetch } = useQuery({
     queryKey: ["emergency-requests"],
@@ -51,6 +54,42 @@ export default function Emergency() {
       render: (item: any) => item.request_datetime ? new Date(item.request_datetime).toLocaleString() : "N/A"
     },
     { key: "status", header: "Status", render: (item: any) => <StatusBadge status={item.status?.toLowerCase() || "open"} /> },
+    {
+      key: "actions",
+      header: "Actions",
+      render: (item: any) => {
+        const currentStatus = item?.status || "Open";
+        const isResolved = currentStatus === "Resolved";
+        const isDispatched = currentStatus === "Dispatched";
+        
+        return (
+          <div className="flex gap-2">
+            {!isDispatched && currentStatus === "Open" && (
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => handleToggleStatus(item.req_id, "Dispatched")}
+                className="gap-2"
+              >
+                <Send className="h-4 w-4" />
+                Dispatch
+              </Button>
+            )}
+            {!isResolved && (
+              <Button
+                variant={isResolved ? "outline" : "default"}
+                size="sm"
+                onClick={() => handleToggleStatus(item.req_id, "Resolved")}
+                className="gap-2"
+              >
+                <CheckCircle className="h-4 w-4" />
+                Resolve
+              </Button>
+            )}
+          </div>
+        );
+      },
+    },
   ];
 
   const serviceColumns = [
@@ -63,25 +102,85 @@ export default function Emergency() {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    const data = {
-      service_id: parseInt(formData.get("service_id") as string),
-      location: formData.get("location") as string || null,
-      notes: formData.get("notes") as string || null,
-      citizen_id: formData.get("citizen_id") ? parseInt(formData.get("citizen_id") as string) : null,
+    
+    // Get service_id from controlled state
+    if (!selectedServiceId) {
+      toast({ 
+        title: "Error", 
+        description: "Please select an emergency service", 
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    // Build data object, only including fields that have values
+    const data: any = {
+      service_id: parseInt(selectedServiceId),
       status: "Open",
     };
+    
+    // Add optional fields only if they have values
+    const location = (formData.get("location") as string)?.trim();
+    if (location) data.location = location;
+    
+    const notes = (formData.get("notes") as string)?.trim();
+    if (notes) data.notes = notes;
+    
+    const citizenId = formData.get("citizen_id") && (formData.get("citizen_id") as string).trim();
+    if (citizenId) {
+      data.citizen_id = parseInt(citizenId);
+    }
+    
+    // Don't send request_datetime - let database use DEFAULT CURRENT_TIMESTAMP
 
     try {
       await emergencyRequestsApi.create(data);
       toast({ title: "Success", description: "Emergency request submitted" });
+      // Reset form and state
+      if (formRef.current) {
+        formRef.current.reset();
+      }
+      setSelectedServiceId("");
       setIsDialogOpen(false);
       refetch();
-    } catch (error) {
-      toast({ title: "Error", description: "Failed to submit request", variant: "destructive" });
+    } catch (error: any) {
+      const errorMessage = error?.message || "Failed to submit request";
+      toast({ 
+        title: "Error", 
+        description: errorMessage, 
+        variant: "destructive" 
+      });
     }
   };
 
   const activeRequests = requests.filter((r: any) => r.status === "Open" || r.status === "Dispatched");
+
+  const handleToggleStatus = async (reqId: number, newStatus: string) => {
+    try {
+      await emergencyRequestsApi.update(reqId, { status: newStatus });
+      toast({
+        title: "Success",
+        description: `Emergency request status updated to ${newStatus}`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["emergency-requests"] });
+    } catch (error: any) {
+      // Extract error message properly
+      let errorMessage = "Failed to update request status";
+      if (error?.message) {
+        errorMessage = typeof error.message === 'string' ? error.message : String(error.message);
+      } else if (error?.detail) {
+        errorMessage = typeof error.detail === 'string' ? error.detail : String(error.detail);
+      } else if (error) {
+        errorMessage = typeof error === 'string' ? error : String(error);
+      }
+      
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    }
+  };
 
   return (
     <MainLayout title="Emergency Services" subtitle="Manage emergency requests and services">
@@ -150,7 +249,12 @@ export default function Emergency() {
       <Card className="mt-6 border-border bg-card">
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-lg">Emergency Requests</CardTitle>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <Dialog open={isDialogOpen} onOpenChange={(open) => {
+            setIsDialogOpen(open);
+            if (!open) {
+              setSelectedServiceId("");
+            }
+          }}>
             <DialogTrigger asChild>
               <Button className="gap-2" variant="destructive">
                 <Plus size={16} />
@@ -161,10 +265,10 @@ export default function Emergency() {
               <DialogHeader>
                 <DialogTitle>Submit Emergency Request</DialogTitle>
               </DialogHeader>
-              <form onSubmit={handleSubmit} className="space-y-4">
+              <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="service_id">Emergency Service</Label>
-                  <Select name="service_id" required>
+                  <Select value={selectedServiceId} onValueChange={setSelectedServiceId} required>
                     <SelectTrigger>
                       <SelectValue placeholder="Select service" />
                     </SelectTrigger>
@@ -186,8 +290,8 @@ export default function Emergency() {
                   <Textarea id="notes" name="notes" rows={3} />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="citizen_id">Citizen ID (optional)</Label>
-                  <Input id="citizen_id" name="citizen_id" type="number" />
+                  <Label htmlFor="citizen_id">Citizen ID <span className="text-muted-foreground text-sm">(optional)</span></Label>
+                  <Input id="citizen_id" name="citizen_id" type="number" placeholder="Leave empty if not applicable" />
                 </div>
                 <div className="flex justify-end gap-2">
                   <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>

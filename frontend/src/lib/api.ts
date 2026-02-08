@@ -24,7 +24,24 @@ async function apiCall<T>(endpoint: string, options?: RequestInit): Promise<T> {
     let errorMessage = "An error occurred";
     try {
       const error = await response.json();
-      errorMessage = error.detail || error.message || JSON.stringify(error);
+      // Handle different error response formats
+      if (Array.isArray(error.detail)) {
+        // If detail is an array, extract messages from each item
+        errorMessage = error.detail.map((item: any) => {
+          if (typeof item === 'string') return item;
+          if (item?.msg) return item.msg;
+          if (item?.message) return item.message;
+          return JSON.stringify(item);
+        }).join(', ');
+      } else if (typeof error.detail === 'string') {
+        errorMessage = error.detail;
+      } else if (error.message) {
+        errorMessage = typeof error.message === 'string' ? error.message : JSON.stringify(error.message);
+      } else if (error.error) {
+        errorMessage = typeof error.error === 'string' ? error.error : JSON.stringify(error.error);
+      } else {
+        errorMessage = JSON.stringify(error);
+      }
     } catch {
       errorMessage = `HTTP ${response.status}: ${response.statusText}`;
     }
