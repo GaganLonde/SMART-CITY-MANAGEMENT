@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -20,6 +19,7 @@ import Complaints from "./pages/Complaints";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
+import { AuthProvider, useAuth } from "./contexts/AuthContext";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -30,52 +30,54 @@ const queryClient = new QueryClient({
   },
 });
 
-const App = () => {
-  const [isAuthenticated, setIsAuthenticated] = useState(
-    () => localStorage.getItem("admin_logged_in") === "true"
+const RequireAuth = () => {
+  const { isAuthenticated } = useAuth();
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+  return <Outlet />;
+};
+
+const AppRoutes = () => {
+  const { isAuthenticated, login } = useAuth();
+
+  return (
+    <Routes>
+      <Route
+        path="/login"
+        element={
+          isAuthenticated ? (
+            <Navigate to="/" replace />
+          ) : (
+            <Login onLogin={login} />
+          )
+        }
+      />
+      <Route element={<RequireAuth />}>
+        <Route path="/" element={<Dashboard />} />
+        <Route path="/citizens" element={<Citizens />} />
+        <Route path="/utilities" element={<Utilities />} />
+        <Route path="/transport" element={<Transport />} />
+        <Route path="/emergency" element={<Emergency />} />
+        <Route path="/waste" element={<Waste />} />
+        <Route path="/complaints" element={<Complaints />} />
+        <Route path="/settings" element={<Settings />} />
+        <Route path="*" element={<NotFound />} />
+      </Route>
+    </Routes>
   );
+};
 
-  const handleLogin = () => {
-    setIsAuthenticated(true);
-    localStorage.setItem("admin_logged_in", "true");
-  };
-
-  const RequireAuth = () => {
-    if (!isAuthenticated) {
-      return <Navigate to="/login" replace />;
-    }
-    return <Outlet />;
-  };
-
+const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <Toaster />
         <Sonner />
         <BrowserRouter>
-          <Routes>
-            <Route
-              path="/login"
-              element={
-                isAuthenticated ? (
-                  <Navigate to="/" replace />
-                ) : (
-                  <Login onLogin={handleLogin} />
-                )
-              }
-            />
-            <Route element={<RequireAuth />}>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/citizens" element={<Citizens />} />
-              <Route path="/utilities" element={<Utilities />} />
-              <Route path="/transport" element={<Transport />} />
-              <Route path="/emergency" element={<Emergency />} />
-              <Route path="/waste" element={<Waste />} />
-              <Route path="/complaints" element={<Complaints />} />
-              <Route path="/settings" element={<Settings />} />
-              <Route path="*" element={<NotFound />} />
-            </Route>
-          </Routes>
+          <AuthProvider>
+            <AppRoutes />
+          </AuthProvider>
         </BrowserRouter>
       </TooltipProvider>
     </QueryClientProvider>

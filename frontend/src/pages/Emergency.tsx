@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AlertTriangle, Ambulance, Shield, Flame, Plus, Phone, CheckCircle, Send } from "lucide-react";
+import { AlertTriangle, Ambulance, Shield, Flame, Plus, Phone, CheckCircle, Send, Trash2 } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { emergencyRequestsApi, emergencyServicesApi } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
@@ -84,6 +84,17 @@ export default function Emergency() {
               >
                 <CheckCircle className="h-4 w-4" />
                 Resolve
+              </Button>
+            )}
+            {isResolved && (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => handleDelete(item.req_id)}
+                className="gap-2"
+              >
+                <Trash2 className="h-4 w-4" />
+                Delete
               </Button>
             )}
           </div>
@@ -172,6 +183,35 @@ export default function Emergency() {
         errorMessage = typeof error.detail === 'string' ? error.detail : String(error.detail);
       } else if (error) {
         errorMessage = typeof error === 'string' ? error : String(error);
+      }
+      
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDelete = async (reqId: number) => {
+    if (!confirm("Are you sure you want to delete this resolved emergency request? This action cannot be undone.")) {
+      return;
+    }
+
+    try {
+      await emergencyRequestsApi.delete(reqId);
+      toast({
+        title: "Success",
+        description: "Emergency request deleted successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["emergency-requests"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+    } catch (error: any) {
+      let errorMessage = "Failed to delete emergency request";
+      if (error?.message) {
+        errorMessage = typeof error.message === 'string' ? error.message : String(error.message);
+      } else if (error?.detail) {
+        errorMessage = typeof error.detail === 'string' ? error.detail : String(error.detail);
       }
       
       toast({

@@ -281,13 +281,22 @@ export default function Utilities() {
   const electricityUsageArray = Array.isArray(electricityUsage) ? electricityUsage : [];
   const waterUsageArray = Array.isArray(waterUsage) ? waterUsage : [];
 
+  // Calculate revenue from bills marked as "Paid"
   const electricityRevenue = electricityBillsArray
     .filter((b: any) => b?.status === "Paid")
-    .reduce((sum: number, b: any) => sum + (parseFloat(b?.amount) || 0), 0);
+    .reduce((sum: number, b: any) => {
+      const amount = parseFloat(b?.amount) || 0;
+      return sum + amount;
+    }, 0);
 
   const waterRevenue = waterBillsArray
     .filter((b: any) => b?.status === "Paid")
-    .reduce((sum: number, b: any) => sum + (parseFloat(b?.amount) || 0), 0);
+    .reduce((sum: number, b: any) => {
+      const amount = parseFloat(b?.amount) || 0;
+      return sum + amount;
+    }, 0);
+
+  const totalRevenue = electricityRevenue + waterRevenue;
 
   const totalElectricityUsage = electricityUsageArray.reduce(
     (sum: number, u: any) => sum + (parseFloat(u?.units_consumed) || 0),
@@ -331,27 +340,47 @@ export default function Utilities() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard
           title="Electricity Revenue"
-          value={`₹${(electricityRevenue / 100000).toFixed(1)} L`}
+          value={
+            electricityRevenue >= 100000
+              ? `₹${(electricityRevenue / 100000).toFixed(1)} L`
+              : electricityRevenue >= 1000
+              ? `₹${(electricityRevenue / 1000).toFixed(1)}K`
+              : `₹${electricityRevenue.toFixed(0)}`
+          }
           icon={Zap}
           variant="warning"
+          subtitle="From paid bills"
         />
         <StatCard
           title="Water Revenue"
-          value={`₹${(waterRevenue / 100000).toFixed(1)} L`}
+          value={
+            waterRevenue >= 100000
+              ? `₹${(waterRevenue / 100000).toFixed(1)} L`
+              : waterRevenue >= 1000
+              ? `₹${(waterRevenue / 1000).toFixed(1)}K`
+              : `₹${waterRevenue.toFixed(0)}`
+          }
           icon={Droplets}
           variant="accent"
+          subtitle="From paid bills"
         />
         <StatCard
-          title="Total Usage"
-          value={`${((totalElectricityUsage + totalWaterUsage) / 1000).toFixed(1)}K`}
-          icon={TrendingUp}
+          title="Total Revenue"
+          value={
+            totalRevenue >= 100000
+              ? `₹${(totalRevenue / 100000).toFixed(1)} L`
+              : totalRevenue >= 1000
+              ? `₹${(totalRevenue / 1000).toFixed(1)}K`
+              : `₹${totalRevenue.toFixed(0)}`
+          }
+          icon={DollarSign}
           variant="primary"
-          subtitle="Combined kWh/L"
+          subtitle="From paid bills"
         />
         <StatCard
           title="Pending Bills"
           value={pendingBills.toString()}
-          icon={DollarSign}
+          icon={TrendingUp}
           variant="destructive"
         />
       </div>

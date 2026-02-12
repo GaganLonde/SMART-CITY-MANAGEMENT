@@ -109,14 +109,14 @@ export default function Dashboard() {
           value={`${formatNumber(statsData.electricity_usage_kwh || 0)} kWh`}
           icon={Zap}
           variant="warning"
-          subtitle="This month"
+          subtitle="Real-time (current month)"
         />
         <StatCard
           title="Water Usage"
           value={`${formatNumber(statsData.water_usage_litres || 0)} L`}
           icon={Droplets}
           variant="accent"
-          subtitle="This month"
+          subtitle="Real-time (current month)"
         />
         <StatCard
           title="Active Buses"
@@ -131,12 +131,11 @@ export default function Dashboard() {
         <StatCard
           title="Emergency Requests"
           value={
-            (statsData.emergency_open || 0) +
-            (statsData.emergency_dispatched || 0)
+            ((statsData.emergency_open || 0) + (statsData.emergency_dispatched || 0)).toString()
           }
           icon={AlertTriangle}
           variant="destructive"
-          subtitle="Active"
+          subtitle="Active (Open + Dispatched)"
         />
         <StatCard
           title="Waste Zones"

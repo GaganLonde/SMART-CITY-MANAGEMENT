@@ -82,16 +82,31 @@ export default function Complaints() {
         const buttonConfig = getButtonConfig(nextStatus);
         const ButtonIcon = buttonConfig.icon;
         
+        const isResolved = currentStatus === "Resolved";
+        
         return (
-          <Button
-            variant={buttonConfig.variant}
-            size="sm"
-            onClick={() => handleToggleStatus(item.complaint_id, nextStatus)}
-            className="gap-2"
-          >
-            <ButtonIcon className="h-4 w-4" />
-            {buttonConfig.text}
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant={buttonConfig.variant}
+              size="sm"
+              onClick={() => handleToggleStatus(item.complaint_id, nextStatus)}
+              className="gap-2"
+            >
+              <ButtonIcon className="h-4 w-4" />
+              {buttonConfig.text}
+            </Button>
+            {isResolved && (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => handleDelete(item.complaint_id)}
+                className="gap-2"
+              >
+                <XCircle className="h-4 w-4" />
+                Delete
+              </Button>
+            )}
+          </div>
         );
       },
     },
@@ -180,6 +195,35 @@ export default function Complaints() {
         errorMessage = typeof error.detail === 'string' ? error.detail : String(error.detail);
       } else if (error) {
         errorMessage = typeof error === 'string' ? error : String(error);
+      }
+      
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDelete = async (complaintId: number) => {
+    if (!confirm("Are you sure you want to delete this resolved complaint? This action cannot be undone.")) {
+      return;
+    }
+
+    try {
+      await complaintsApi.delete(complaintId);
+      toast({
+        title: "Success",
+        description: "Complaint deleted successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["complaints"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+    } catch (error: any) {
+      let errorMessage = "Failed to delete complaint";
+      if (error?.message) {
+        errorMessage = typeof error.message === 'string' ? error.message : String(error.message);
+      } else if (error?.detail) {
+        errorMessage = typeof error.detail === 'string' ? error.detail : String(error.detail);
       }
       
       toast({
