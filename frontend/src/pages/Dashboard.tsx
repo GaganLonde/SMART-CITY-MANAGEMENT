@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { StatCard } from "@/components/ui/stat-card";
 import {
@@ -16,6 +17,8 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { statsApi, emergencyServicesApi } from "@/lib/api";
 
 export default function Dashboard() {
+  const navigate = useNavigate();
+
   const { data: stats, isLoading } = useQuery({
     queryKey: ["dashboard-stats"],
     queryFn: () => statsApi.getStats(),
@@ -262,25 +265,30 @@ export default function Dashboard() {
                 icon: Users,
                 label: "Add Citizen",
                 color: "from-primary to-accent",
+                path: "/citizens",
               },
               {
                 icon: AlertTriangle,
                 label: "New Emergency",
                 color: "from-destructive to-warning",
+                path: "/emergency",
               },
               {
                 icon: MessageSquare,
                 label: "File Complaint",
                 color: "from-info to-primary",
+                path: "/complaints",
               },
               {
                 icon: Zap,
                 label: "Generate Bill",
                 color: "from-warning to-accent",
+                path: "/utilities",
               },
             ].map((action, index) => (
               <button
                 key={index}
+                onClick={() => navigate(action.path)}
                 className="group flex items-center gap-3 rounded-lg border border-border bg-muted/30 p-4 transition-all duration-200 hover:border-primary/50 hover:bg-muted/50"
               >
                 <div

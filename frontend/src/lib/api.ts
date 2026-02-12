@@ -395,3 +395,12 @@ export const complaintUpdatesApi = {
 export const statsApi = {
   getStats: () => apiCall<any>("/stats"),
 };
+
+// Auth API
+export const authApi = {
+  login: (data: { username: string; password: string }) =>
+    apiCall<any>("/admin/login", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+};

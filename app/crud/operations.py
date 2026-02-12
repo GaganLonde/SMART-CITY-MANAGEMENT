@@ -902,3 +902,17 @@ def get_dashboard_stats():
     
     return stats
 
+# ==================== ADMIN AUTH ====================
+def admin_login(username: str, password: str):
+    """
+    Validate admin credentials against admin_users table.
+    Passwords are stored as SHA2-256 hashes in MySQL.
+    """
+    query = """
+        SELECT admin_id, username
+        FROM admin_users
+        WHERE username = %s
+          AND password_hash = SHA2(%s, 256)
+    """
+    return db.execute_one(query, (username, password))
+

@@ -20,6 +20,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.post("/admin/login", response_model=dict, tags=["Auth"])
+def admin_login(payload: AdminLoginRequest):
+    """Authenticate admin user using credentials stored in MySQL."""
+    user = crud.admin_login(payload.username, payload.password)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid username or password")
+    return {"admin_id": user["admin_id"], "username": user["username"]}
+
 # ==================== ADDRESSES ROUTES ====================
 @app.post("/addresses", response_model=dict, tags=["Addresses"])
 def create_address(address: AddressCreate):

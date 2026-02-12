@@ -442,3 +442,9 @@ class ComplaintUpdateHistory(ComplaintUpdateHistoryBase):
     class Config:
         from_attributes = True
 
+
+# Admin Auth Models
+class AdminLoginRequest(BaseModel):
+    username: str
+    password: str
+

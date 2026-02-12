@@ -289,7 +289,6 @@ CREATE TABLE complaints (
 ) ENGINE=InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
 
--- 18) complaint_updates
 CREATE TABLE complaint_updates (
   update_id INT AUTO_INCREMENT PRIMARY KEY,
   complaint_id INT NOT NULL,
@@ -302,10 +301,22 @@ CREATE TABLE complaint_updates (
   INDEX idx_cu_complaint (complaint_id)
 ) ENGINE=InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
+-- 19) admin_users (for admin login)
+CREATE TABLE admin_users (
+  admin_id INT AUTO_INCREMENT PRIMARY KEY,
+  username VARCHAR(100) NOT NULL UNIQUE,
+  password_hash CHAR(64) NOT NULL, -- SHA2-256 hash of password
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  last_login TIMESTAMP NULL
+) ENGINE=InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
 ----------------------------------------------------
 -- Sample data (small set) - adapt/extend to 1000+ later
 ----------------------------------------------------
+
+-- admin_users (default admin: admin / admin123)
+INSERT INTO admin_users (username, password_hash)
+VALUES ('admin', SHA2('admin123', 256));
 
 -- addresses
 INSERT INTO addresses (street, area, city, state, zipcode)
