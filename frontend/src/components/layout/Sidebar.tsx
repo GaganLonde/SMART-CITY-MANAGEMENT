@@ -1,16 +1,16 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { 
-  LayoutDashboard, 
-  Users, 
-  Zap, 
-  Droplets, 
-  Bus, 
-  AlertTriangle, 
-  Trash2, 
+import {
+  LayoutDashboard,
+  Users,
+  Zap,
+  Droplets,
+  Bus,
+  AlertTriangle,
+  Trash2,
   MessageSquare,
   Settings,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -37,10 +37,10 @@ export function Sidebar() {
   const location = useLocation();
 
   return (
-    <aside 
+    <aside
       className={cn(
         "fixed left-0 top-0 z-40 h-screen border-r border-border bg-sidebar transition-all duration-300",
-        collapsed ? "w-16" : "w-64"
+        collapsed ? "w-16" : "w-64",
       )}
     >
       {/* Logo */}
@@ -73,18 +73,20 @@ export function Sidebar() {
                 "group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
                 isActive
                   ? "bg-primary/10 text-primary"
-                  : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
+                  : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground",
               )}
             >
               {isActive && (
                 <div className="absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-r-full bg-primary" />
               )}
-              <item.icon 
-                size={20} 
+              <item.icon
+                size={20}
                 className={cn(
                   "shrink-0 transition-colors",
-                  isActive ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
-                )} 
+                  isActive
+                    ? "text-primary"
+                    : "text-muted-foreground group-hover:text-foreground",
+                )}
               />
               {!collapsed && <span>{item.label}</span>}
             </NavLink>
@@ -96,9 +98,7 @@ export function Sidebar() {
       {!collapsed && (
         <div className="absolute bottom-4 left-4 right-4">
           <div className="rounded-lg border border-border bg-card/50 p-3">
-            <p className="text-xs text-muted-foreground">
-              Smart City v1.0
-            </p>
+            <p className="text-xs text-muted-foreground">Smart City v1.0</p>
           </div>
         </div>
       )}
